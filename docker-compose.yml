@@ -1,6 +1,7 @@
 services:
   tuya-to-mqtt:
-    build: .
+    image: ghcr.io/tfoote000/eg4heatpumptuyatomqtt:latest
+    # build: .  # uncomment to build from source instead
     env_file:
       - .env
     volumes:
