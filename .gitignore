@@ -1,0 +1,18 @@
+# Rust build artifacts
+/target/
+
+# Environment and secrets
+.env
+devices.json
+
+# Python
+__pycache__/
+*.pyc
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

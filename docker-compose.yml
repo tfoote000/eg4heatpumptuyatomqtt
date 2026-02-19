@@ -1,0 +1,10 @@
+services:
+  tuya-to-mqtt:
+    build: .
+    env_file:
+      - .env
+    volumes:
+      - ./devices.json:/app/devices.json:ro
+    working_dir: /app
+    restart: unless-stopped
+    network_mode: host
