@@ -125,6 +125,7 @@
                     "range": [
                         "auto",
                         "low",
+                        "mid",
                         "high",
                         "strong"
                     ]

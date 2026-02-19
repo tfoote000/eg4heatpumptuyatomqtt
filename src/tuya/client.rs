@@ -223,10 +223,9 @@ pub fn build_command(
         crate::config::DpType::Enum(range) => {
             if !range.is_empty() && !range.contains(&raw_value.to_string()) {
                 warn!(
-                    "Value '{}' not in enum range {:?} for {}",
+                    "Value '{}' not in declared enum range {:?} for {} — sending anyway",
                     raw_value, range, dp_code
                 );
-                return None;
             }
             json!(raw_value)
         }
