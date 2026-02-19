@@ -129,7 +129,7 @@ tuya/{device_id}/command/{dp_code}   → publish here to send commands
 tuya/abc123/state/switch           → "true"
 tuya/abc123/state/temp_set         → "22"
 tuya/abc123/state/temp_current     → "21"
-tuya/abc123/state/mode             → "hot"
+tuya/abc123/state/mode             → "heat"
 tuya/abc123/state/fan_speed_enum   → "auto"
 tuya/abc123/state/work_status      → "heating"
 tuya/abc123/state/solar_power      → "847"
@@ -140,18 +140,33 @@ tuya/abc123/state/total_energy     → "1640523"
 
 **Example commands:**
 ```bash
-# Turn off
-mosquitto_pub -t "tuya/abc123/command/switch" -m "false"
+# Turn off via mode (Home Assistant style)
+mosquitto_pub -t "tuya/abc123/command/mode" -m "off"
 
-# Set to cooling mode
-mosquitto_pub -t "tuya/abc123/command/mode" -m "cold"
+# Set to cooling mode (also turns unit on)
+mosquitto_pub -t "tuya/abc123/command/mode" -m "cool"
 
-# Set temperature to 24
-mosquitto_pub -t "tuya/abc123/command/temp_set" -m "24"
+# Set temperature (accepts integers or floats)
+mosquitto_pub -t "tuya/abc123/command/temp_set_f" -m "72"
 
-# Set fan to high
-mosquitto_pub -t "tuya/abc123/command/fan_speed_enum" -m "high"
+# Set fan speed
+mosquitto_pub -t "tuya/abc123/command/fan_speed_enum" -m "medium"
 ```
+
+### Home Assistant Integration
+
+The bridge automatically converts between Home Assistant's HVAC values and Tuya's device values:
+
+| DP | HA Value | Tuya Value |
+|----|----------|------------|
+| mode | `off` | switch = false |
+| mode | `cool` | `cold` + switch = true |
+| mode | `heat` | `hot` + switch = true |
+| mode | `fan_only` | `wind` + switch = true |
+| mode | `auto` | `auto` + switch = true |
+| fan_speed_enum | `medium` | `mid` |
+
+Setting mode to anything other than "off" automatically turns the unit on. Setting mode to "off" turns the unit off via the switch DP. State topics publish HA-compatible values (e.g., `state/mode` reports `"cool"` not `"cold"`).
 
 ## Complete DP Reference
 
@@ -162,7 +177,7 @@ mosquitto_pub -t "tuya/abc123/command/fan_speed_enum" -m "high"
 | 1 | `switch` | Boolean | true/false | Power on/off |
 | 2 | `temp_set` | Integer | 16-32 | Target temperature (C) |
 | 3 | `temp_current` | Integer | -20 to 100 | Current temperature (C, signed) |
-| 4 | `mode` | Enum | auto, cold, hot, wind | HVAC mode |
+| 4 | `mode` | Enum | off, auto, cool, heat, fan_only | HVAC mode (HA-compatible) |
 | 6 | `mode_eco` | Boolean | true/false | Eco mode |
 | 9 | `anion` | Boolean | true/false | Ionizer |
 | 10 | `heat` | Boolean | true/false | Auxiliary/compressor heat active |
@@ -171,7 +186,7 @@ mosquitto_pub -t "tuya/abc123/command/fan_speed_enum" -m "high"
 | 20 | `temp_current_f` | Integer | -4 to 212 | Current temperature (F) |
 | 21 | `temp_unit_convert` | Enum | c, f | Temperature unit |
 | 22 | `work_status` | Enum | off, cooling, heating, ventilation | Operating status |
-| 23 | `fan_speed_enum` | Enum | auto, low, high, strong | Fan speed |
+| 23 | `fan_speed_enum` | Enum | auto, low, medium, high | Fan speed (HA-compatible) |
 | 24 | `fault` | Bitmap | sensor_fault, temp_fault | Fault flags |
 | 101 | `sleep` | Boolean | true/false | Sleep mode |
 

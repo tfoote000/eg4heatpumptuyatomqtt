@@ -11,6 +11,42 @@ use crate::config::DeviceConfig;
 
 use super::{DpCommand, DpUpdate};
 
+/// Convert HA enum values to Tuya device values (command direction).
+fn ha_to_tuya(dp_code: &str, value: &str) -> String {
+    match dp_code {
+        "mode" => match value {
+            "cool" => "cold",
+            "heat" => "hot",
+            "fan_only" => "wind",
+            _ => value,
+        },
+        "fan_speed_enum" => match value {
+            "medium" => "mid",
+            _ => value,
+        },
+        _ => value,
+    }
+    .to_string()
+}
+
+/// Convert Tuya device values to HA enum values (state direction).
+fn tuya_to_ha(dp_code: &str, value: &str) -> String {
+    match dp_code {
+        "mode" => match value {
+            "cold" => "cool",
+            "hot" => "heat",
+            "wind" => "fan_only",
+            _ => value,
+        },
+        "fan_speed_enum" => match value {
+            "mid" => "medium",
+            _ => value,
+        },
+        _ => value,
+    }
+    .to_string()
+}
+
 pub struct TuyaClient {
     config: DeviceConfig,
 }
@@ -178,7 +214,7 @@ impl TuyaClient {
             let value_str = match value {
                 serde_json::Value::Bool(b) => b.to_string(),
                 serde_json::Value::Number(n) => n.to_string(),
-                serde_json::Value::String(s) => s.clone(),
+                serde_json::Value::String(s) => tuya_to_ha(dp_code, s),
                 other => other.to_string(),
             };
 
@@ -207,6 +243,27 @@ pub fn build_command(
     let dp_id = config.reverse_mapping.get(dp_code)?;
     let dp_info = config.dp_mapping.get(dp_id)?;
 
+    // Convert HA enum values to Tuya values (e.g. "cool" → "cold", "medium" → "mid")
+    let converted_value = ha_to_tuya(dp_code, raw_value);
+
+    // HA sends "off" to command/mode to turn the unit off, and a real mode to turn it on.
+    if dp_code == "mode" {
+        if let Some(switch_dp_id) = config.reverse_mapping.get("switch") {
+            let mut dps = serde_json::Map::new();
+
+            if raw_value == "off" {
+                dps.insert(switch_dp_id.clone(), json!(false));
+            } else {
+                dps.insert(switch_dp_id.clone(), json!(true));
+                dps.insert(dp_id.clone(), json!(converted_value));
+            }
+
+            return Some(DpCommand {
+                dps: serde_json::Value::Object(dps),
+            });
+        }
+    }
+
     let value: serde_json::Value = match &dp_info.dp_type {
         crate::config::DpType::Boolean => match raw_value {
             "true" | "1" | "on" => json!(true),
@@ -217,17 +274,19 @@ pub fn build_command(
             }
         },
         crate::config::DpType::Integer => {
-            let n: i64 = raw_value.parse().ok()?;
+            let n: i64 = raw_value.parse().or_else(|_| {
+                raw_value.parse::<f64>().map(|f| f as i64)
+            }).ok()?;
             json!(n)
         }
         crate::config::DpType::Enum(range) => {
-            if !range.is_empty() && !range.contains(&raw_value.to_string()) {
+            if !range.is_empty() && !range.contains(&converted_value) {
                 warn!(
                     "Value '{}' not in declared enum range {:?} for {} — sending anyway",
-                    raw_value, range, dp_code
+                    converted_value, range, dp_code
                 );
             }
-            json!(raw_value)
+            json!(converted_value)
         }
         crate::config::DpType::Bitmap => {
             warn!("Bitmap commands not supported for {}", dp_code);
