@@ -170,12 +170,19 @@ Setting mode to anything other than "off" automatically turns the unit on. Setti
 
 ### MQTT Discovery
 
-On connect the bridge publishes a retained `climate` discovery config per device to
-`{HA_DISCOVERY_PREFIX}/climate/{topic_name}/config`, so Home Assistant auto-creates the
-climate entity — no hand-written `climate:` YAML needed. The entity name and HA device name
-come from the device's `name` in `devices.json`; all topics are derived from
-`MQTT_TOPIC_PREFIX` and the device's topic name at runtime. Devices lacking the required heat-pump
-DP codes (`work_status`, `temp_current_f`, `fan_speed_enum`, `mode`, `switch`, `temp_set_f`) are skipped.
+On connect the bridge publishes retained discovery configs per device, so Home Assistant
+auto-creates the entities — no hand-written YAML needed:
+
+- a `climate` entity at `{HA_DISCOVERY_PREFIX}/climate/{topic_name}/config`, and
+- `sensor` entities at `{HA_DISCOVERY_PREFIX}/sensor/{topic_name}/{code}/config` for the
+  solar/grid figures (`solar_power`, `solar_energy`, `solar_percent`, `grid_power`,
+  `grid_percent`, `total_energy`).
+
+All entities are grouped under one HA device. The entity/device name comes from the device's
+`name` in `devices.json`; all topics are derived from `MQTT_TOPIC_PREFIX` and the device's topic
+name at runtime. The climate entity is skipped for devices lacking the required heat-pump DP codes
+(`work_status`, `temp_current_f`, `fan_speed_enum`, `mode`, `switch`, `temp_set_f`); each sensor is
+skipped if its DP code isn't present.
 
 | Env var | Default | Purpose |
 |---------|---------|---------|
