@@ -163,8 +163,11 @@ fn sensor_message(
     }
 
     let tn = &device.topic_name;
+    // Use the bare suffix as the entity name; HA prepends the device name for
+    // display ("Solar Heat Pump Grid Power"). Prefixing it ourselves makes HA
+    // strip the duplicate device name and leave a stray " - ".
     let mut payload = json!({
-        "name": format!("{} - {}", device.name, def.name_suffix),
+        "name": def.name_suffix,
         "unique_id": format!("{tn}_{}", def.code),
         "state_topic": format!("{prefix}/{tn}/state/{}", def.code),
         "availability_topic": format!("{prefix}/{tn}/bridge_status"),
