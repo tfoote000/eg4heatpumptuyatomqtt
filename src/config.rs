@@ -7,7 +7,16 @@ use std::net::IpAddr;
 pub struct Config {
     pub mqtt: MqttConfig,
     pub tuya: TuyaConfig,
+    pub ha: HaConfig,
     pub devices: Vec<DeviceConfig>,
+}
+
+#[derive(Debug, Clone)]
+pub struct HaConfig {
+    /// Publish Home Assistant MQTT discovery configs on connect.
+    pub discovery: bool,
+    /// Discovery prefix HA listens on (usually `homeassistant`).
+    pub discovery_prefix: String,
 }
 
 #[derive(Debug, Clone)]
@@ -104,6 +113,20 @@ impl Config {
             },
             tuya: TuyaConfig {
                 poll_interval_secs: env_or_default("TUYA_POLL_INTERVAL_SECS", 30),
+            },
+            ha: HaConfig {
+                discovery: env::var("HA_DISCOVERY")
+                    .map(|v| {
+                        !matches!(
+                            v.trim().to_ascii_lowercase().as_str(),
+                            "0" | "false" | "no" | "off"
+                        )
+                    })
+                    .unwrap_or(true),
+                discovery_prefix: env_optional("HA_DISCOVERY_PREFIX")
+                    .map(|s| s.trim_matches('/').to_string())
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or_else(|| "homeassistant".to_string()),
             },
             devices,
         };

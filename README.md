@@ -168,6 +168,20 @@ The bridge automatically converts between Home Assistant's HVAC values and Tuya'
 
 Setting mode to anything other than "off" automatically turns the unit on. Setting mode to "off" turns the unit off via the switch DP. State topics publish HA-compatible values (e.g., `state/mode` reports `"cool"` not `"cold"`).
 
+### MQTT Discovery
+
+On connect the bridge publishes a retained `climate` discovery config per device to
+`{HA_DISCOVERY_PREFIX}/climate/{topic_name}/config`, so Home Assistant auto-creates the
+climate entity — no hand-written `climate:` YAML needed. The entity name and HA device name
+come from the device's `name` in `devices.json`; all topics are derived from
+`MQTT_TOPIC_PREFIX` and the device's topic name at runtime. Devices lacking the required heat-pump
+DP codes (`work_status`, `temp_current_f`, `fan_speed_enum`, `mode`, `switch`, `temp_set_f`) are skipped.
+
+| Env var | Default | Purpose |
+|---------|---------|---------|
+| `HA_DISCOVERY` | `true` | Set `false`/`0`/`off` to disable discovery |
+| `HA_DISCOVERY_PREFIX` | `homeassistant` | HA discovery prefix |
+
 ## Complete DP Reference
 
 ### Official DPs (from Tuya cloud)

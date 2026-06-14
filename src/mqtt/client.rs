@@ -95,6 +95,33 @@ impl MqttClient {
                                             }
                                         }
 
+                                        // Publish Home Assistant discovery configs (retained)
+                                        if self.config.ha.discovery {
+                                            let messages =
+                                                crate::discovery::build_messages(&self.config);
+                                            info!(
+                                                "Publishing {} Home Assistant discovery config(s)",
+                                                messages.len()
+                                            );
+                                            for msg in messages {
+                                                if let Err(e) = self
+                                                    .client
+                                                    .publish(
+                                                        &msg.topic,
+                                                        QoS::AtLeastOnce,
+                                                        true,
+                                                        msg.payload.into_bytes(),
+                                                    )
+                                                    .await
+                                                {
+                                                    error!(
+                                                        "Failed to publish discovery {}: {}",
+                                                        msg.topic, e
+                                                    );
+                                                }
+                                            }
+                                        }
+
                                         // Subscribe to command topics
                                         for topic in &subscribe_topics {
                                             if let Err(e) = self
