@@ -70,6 +70,16 @@ impl MqttClient {
             .map(|d| self.config.device_command_topic(&d.topic_name))
             .collect();
 
+        // Home Assistant publishes "online" here when it starts. Power DPs are
+        // published without retain and every DP only on change, so after an HA
+        // restart those sensors stay "unknown" until the value moves. Clearing
+        // the cache makes the next poll republish everything.
+        let ha_status_topic = self
+            .config
+            .ha
+            .discovery
+            .then(|| format!("{}/status", self.config.ha.discovery_prefix));
+
         let mut last_values: HashMap<String, String> = HashMap::new();
 
         loop {
@@ -132,10 +142,24 @@ impl MqttClient {
                                                 error!("Failed to subscribe to {}: {}", topic, e);
                                             }
                                         }
+                                        if let Some(topic) = &ha_status_topic {
+                                            if let Err(e) = self
+                                                .client
+                                                .subscribe(topic, QoS::AtLeastOnce)
+                                                .await
+                                            {
+                                                error!("Failed to subscribe to {}: {}", topic, e);
+                                            }
+                                        }
                                     }
                                     Incoming::Publish(publish) => {
                                         let payload =
                                             String::from_utf8_lossy(&publish.payload).to_string();
+                                        if is_ha_online(&ha_status_topic, &publish.topic, &payload) {
+                                            info!("Home Assistant came online; republishing all states on next poll");
+                                            last_values.clear();
+                                            continue;
+                                        }
                                         let msg = MqttMessage {
                                             topic: publish.topic.clone(),
                                             payload,
@@ -180,6 +204,11 @@ impl MqttClient {
                             Ok(Event::Incoming(Incoming::Publish(publish))) => {
                                 let payload =
                                     String::from_utf8_lossy(&publish.payload).to_string();
+                                if is_ha_online(&ha_status_topic, &publish.topic, &payload) {
+                                    info!("Home Assistant came online; republishing all states on next poll");
+                                    last_values.clear();
+                                    continue;
+                                }
                                 let msg = MqttMessage {
                                     topic: publish.topic.clone(),
                                     payload,
@@ -195,5 +224,24 @@ impl MqttClient {
                 }
             }
         }
+    }
+}
+
+/// True when `topic` is Home Assistant's status topic and the payload is "online".
+fn is_ha_online(ha_status_topic: &Option<String>, topic: &str, payload: &str) -> bool {
+    ha_status_topic.as_deref() == Some(topic) && payload.trim() == "online"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_ha_online;
+
+    #[test]
+    fn detects_ha_birth_message() {
+        let t = Some("homeassistant/status".to_string());
+        assert!(is_ha_online(&t, "homeassistant/status", "online"));
+        assert!(!is_ha_online(&t, "homeassistant/status", "offline"));
+        assert!(!is_ha_online(&t, "tuya/x/command/switch", "online"));
+        assert!(!is_ha_online(&None, "homeassistant/status", "online"));
     }
 }
