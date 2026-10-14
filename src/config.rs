@@ -38,6 +38,8 @@ pub struct TuyaConfig {
 pub struct DeviceConfig {
     pub id: String,
     pub key: String,
+    /// Tuya local protocol version ("3.3", "3.4", ...)
+    pub protocol: String,
     pub ip: IpAddr,
     pub name: String,
     /// Sanitized name for use in MQTT topics (lowercase, spaces to underscores)
@@ -60,11 +62,18 @@ pub enum DpType {
     Bitmap,
 }
 
+/// Protocol used when a device entry doesn't specify one.
+const DEFAULT_PROTOCOL: &str = "3.3";
+
 // Serde structs for parsing tinytuya device listing JSON
 #[derive(Deserialize)]
 struct RawDevice {
     id: String,
     key: String,
+    /// Tuya local protocol version. Accepts "version" too, since that is the
+    /// key tinytuya writes. Defaults to 3.3 when missing or empty.
+    #[serde(default, alias = "version")]
+    protocol: Option<serde_json::Value>,
     #[serde(default)]
     ip: Option<String>,
     #[serde(default)]
@@ -190,6 +199,12 @@ fn load_devices(path: &str) -> Result<Vec<DeviceConfig>, String> {
                 }
             }
 
+            let protocol = match raw.protocol {
+                Some(serde_json::Value::String(s)) if !s.trim().is_empty() => s.trim().to_string(),
+                Some(serde_json::Value::Number(n)) => n.to_string(),
+                _ => DEFAULT_PROTOCOL.to_string(),
+            };
+
             let name = raw.name.unwrap_or_else(|| raw.id.clone());
             let topic_name = sanitize_topic_name(&name);
 
@@ -197,6 +212,7 @@ fn load_devices(path: &str) -> Result<Vec<DeviceConfig>, String> {
                 name,
                 id: raw.id,
                 key: raw.key,
+                protocol,
                 ip,
                 topic_name,
                 dp_mapping,
@@ -242,5 +258,49 @@ fn parse_dp_type(raw: &RawDpMapping) -> DpType {
         }
         "Bitmap" => DpType::Bitmap,
         _ => DpType::Integer, // fallback
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    fn load(json: &str) -> Vec<DeviceConfig> {
+        let mut f = tempfile_path();
+        f.1.write_all(json.as_bytes()).unwrap();
+        load_devices(f.0.to_str().unwrap()).unwrap()
+    }
+
+    fn tempfile_path() -> (std::path::PathBuf, std::fs::File) {
+        let p = std::env::temp_dir().join(format!(
+            "tuya_devices_test_{}_{}.json",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let f = std::fs::File::create(&p).unwrap();
+        (p, f)
+    }
+
+    fn entry(extra: &str) -> String {
+        format!(
+            r#"[{{"id":"abc","key":"k","ip":"10.0.0.1"{extra},"mapping":{{"1":{{"code":"switch","type":"Boolean","values":{{}}}}}}}}]"#
+        )
+    }
+
+    #[test]
+    fn protocol_defaults_to_3_3() {
+        assert_eq!(load(&entry(""))[0].protocol, "3.3");
+        assert_eq!(load(&entry(r#","protocol":"""#))[0].protocol, "3.3");
+    }
+
+    #[test]
+    fn protocol_field_and_version_alias() {
+        assert_eq!(load(&entry(r#","protocol":"3.4""#))[0].protocol, "3.4");
+        assert_eq!(load(&entry(r#","version":"3.4""#))[0].protocol, "3.4");
+        assert_eq!(load(&entry(r#","version":3.4"#))[0].protocol, "3.4");
     }
 }

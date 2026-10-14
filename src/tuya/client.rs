@@ -95,7 +95,7 @@ impl TuyaClient {
         cmd_rx: &mut mpsc::Receiver<DpCommand>,
         poll_interval: Duration,
     ) -> Result<(), String> {
-        let mut device = TuyaDevice::new("3.3", &self.config.id, Some(&self.config.key), self.config.ip)
+        let mut device = TuyaDevice::new(&self.config.protocol, &self.config.id, Some(&self.config.key), self.config.ip)
             .map_err(|e| format!("Failed to create device: {e:?}"))?;
 
         let mut receiver = device

@@ -35,10 +35,11 @@ async fn main() {
 
     for device in &config.devices {
         info!(
-            "  Device: {} ({}) at {} — {} DPs mapped",
+            "  Device: {} ({}) at {} (protocol {}) — {} DPs mapped",
             device.name,
             device.id,
             device.ip,
+            device.protocol,
             device.dp_mapping.len(),
         );
     }

@@ -4,6 +4,7 @@
         "id": "YOUR_DEVICE_ID",
         "key": "YOUR_LOCAL_KEY",
         "ip": "192.168.1.100",
+        "protocol": "3.3",
         "mac": "",
         "uuid": "",
         "sn": "",

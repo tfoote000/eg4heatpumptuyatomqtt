@@ -25,7 +25,7 @@ This bridge connects directly to the device over your local network (no cloud de
 ```
 
 The bridge:
-1. Connects to the WBR3 module over your LAN using Tuya's local protocol (version 3.3, AES-128-ECB encrypted, port 6668)
+1. Connects to the WBR3 module over your LAN using Tuya's local protocol (version 3.3 by default, configurable per device, e.g. 3.4; port 6668)
 2. Queries all data points on startup, then listens for real-time updates
 3. Publishes each DP value to an MQTT topic using the DP's code name
 4. Subscribes to MQTT command topics so you can control the device
@@ -62,8 +62,9 @@ Edit `devices.json`:
 - Replace `YOUR_DEVICE_ID` with your actual device ID
 - Replace `YOUR_LOCAL_KEY` with your actual local key
 - Replace `192.168.1.100` with your heat pump's IP address
+- Set `"protocol"` to your unit's Tuya local protocol version (default `3.3` if omitted). Some units, such as the 12K hybrid models, use `3.4`; if the bridge connects and then immediately logs `TcpStreamClosed`, check the version with `python3 -m tinytuya scan`
 
-Or if you ran `tinytuya wizard`, copy its output and add the `"ip"` field.
+Or if you ran `tinytuya wizard`, copy its output and add the `"ip"` field. A `"version"` field from tinytuya is accepted in place of `"protocol"`.
 
 ### 3. Configure Environment
 
